@@ -1,190 +1,206 @@
+import main as st
 import numpy as np
 import matplotlib.pyplot as plt
 
+# CONFIG
+st.set_page_config(page_title="Fuzzy Type-2 Grow Light", layout="wide")
+st.title("🌱 Fuzzy Type-2 Grow Light Controller (Streamlit)")
 
-# ==============================================================
-# 1. Gaussian Type-2
-# ==============================================================
-def gaussian_t2(x, mean, sigma_u, sigma_l):
-    upper = np.exp(-0.5 * ((x - mean) / sigma_u) ** 2)
-    lower = np.exp(-0.5 * ((x - mean) / sigma_l) ** 2)
+
+# Fungsi
+def gaussian_t2(x, mean, sigma_upper, sigma_lower):
+    upper = np.exp(-0.5 * ((x - mean) / sigma_upper) ** 2)
+    lower = np.exp(-0.5 * ((x - mean) / sigma_lower) ** 2)
     return upper, lower
 
 
-# ==============================================================
-# 2. Domain Generator
-# ==============================================================
-def create_domains():
-    return {
-        "height": np.linspace(0, 110, 300),
-        "distance": np.linspace(0, 100, 300),
-        "output": np.linspace(-50, 50, 300),
-    }
+def fuzzify(value, x, mf):
+    upper = np.interp(value, x, mf[0])
+    lower = np.interp(value, x, mf[1])
+    return (upper + lower) / 2
 
 
-# ==============================================================
-# 3. Membership Function Builder
-# ==============================================================
-def build_memberships(domains):
-    xh, xd, xo = domains["height"], domains["distance"], domains["output"]
-
-    mf = {
-        "height": {
-            "semai": gaussian_t2(xh, 8, 4, 2),
-            "vegetatif": gaussian_t2(xh, 30, 6, 3),
-            "generatif": gaussian_t2(xh, 60, 6, 3),
-            "produktif": gaussian_t2(xh, 90, 6, 3),
-        },
-        "distance": {
-            "sangat_dekat": gaussian_t2(xd, 5, 3, 1.5),
-            "dekat": gaussian_t2(xd, 15, 5, 3),
-            "sedang": gaussian_t2(xd, 30, 6, 3),
-            "jauh": gaussian_t2(xd, 50, 7, 4),
-            "sangat_jauh": gaussian_t2(xd, 80, 7, 4),
-        },
-        "output": {
-            "turun_banyak": gaussian_t2(xo, -30, 6, 3),
-            "turun_sedikit": gaussian_t2(xo, -15, 5, 2),
-            "diam": gaussian_t2(xo, 0, 4, 2),
-            "naik_sedikit": gaussian_t2(xo, 15, 5, 2),
-            "naik_banyak": gaussian_t2(xo, 30, 6, 3),
-        },
-    }
-    return mf
-
-
-# ==============================================================
-# 4. Plotter
-# ==============================================================
-def plot_mf(x, mf_set, title):
-    plt.figure(figsize=(8, 5))
-    for name, (u, l) in mf_set.items():
-        plt.fill_between(x, l, u, alpha=0.3, label=name)
-    plt.title(title)
-    plt.xlabel("Value")
-    plt.ylabel("Membership")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-
-# ==============================================================
-# 5. Fuzzification
-# ==============================================================
-def fuzzify(val, x, mf):
-    u = np.interp(val, x, mf[0])
-    l = np.interp(val, x, mf[1])
-    return (u + l) / 2
-
-
-# ==============================================================
-# 6. Rule Base Builder
-# ==============================================================
-def build_rules(mf_out):
-    return [
-        ("semai", "sangat_jauh", "turun_banyak"),
-        ("semai", "jauh", "turun_banyak"),
-        ("semai", "sedang", "turun_sedikit"),
-        ("semai", "dekat", "diam"),
-        ("semai", "sangat_dekat", "naik_sedikit"),
-        ("vegetatif", "sangat_jauh", "turun_banyak"),
-        ("vegetatif", "jauh", "turun_sedikit"),
-        ("vegetatif", "sedang", "diam"),
-        ("vegetatif", "dekat", "naik_sedikit"),
-        ("vegetatif", "sangat_dekat", "naik_banyak"),
-        ("generatif", "sangat_jauh", "turun_sedikit"),
-        ("generatif", "jauh", "turun_sedikit"),
-        ("generatif", "sedang", "diam"),
-        ("generatif", "dekat", "naik_sedikit"),
-        ("generatif", "sangat_dekat", "naik_banyak"),
-        ("produktif", "sangat_jauh", "diam"),
-        ("produktif", "jauh", "diam"),
-        ("produktif", "sedang", "naik_sedikit"),
-        ("produktif", "dekat", "naik_sedikit"),
-        ("produktif", "sangat_dekat", "naik_banyak"),
-    ]
-
-
-# ==============================================================
-# 7. Inference Engine
-# ==============================================================
-def infer(mf, domains, h_val, d_val, rules):
-    xh, xd, xo = domains["height"], domains["distance"], domains["output"]
-
-    μh = {k: fuzzify(h_val, xh, v) for k, v in mf["height"].items()}
-    μd = {k: fuzzify(d_val, xd, v) for k, v in mf["distance"].items()}
-
-    agg_u = np.zeros_like(xo)
-    agg_l = np.zeros_like(xo)
-
-    print("\n=== RULE AKTIF ===")
-    for h, d, out in rules:
-        strength = min(μh[h], μd[d])
-        print(f"{h.upper()} & {d.upper()} -> {out.upper()} ({strength:.2f})")
-
-        out_u, out_l = mf["output"][out]
-        agg_u = np.fmax(agg_u, np.fmin(strength, out_u))
-        agg_l = np.fmax(agg_l, np.fmin(strength, out_l))
-
-    return agg_u, agg_l
-
-
-# ==============================================================
-# 8. Defuzzification
-# ==============================================================
-def defuzz(x, u, l):
-    try:
-        cu = np.sum(x * u) / np.sum(u)
-        cl = np.sum(x * l) / np.sum(l)
-        return (cu + cl) / 2
-    except ZeroDivisionError:
+def defuzz(x, upper, lower):
+    if np.sum(upper) == 0 or np.sum(lower) == 0:
         return 0
+    c_upper = np.sum(x * upper) / np.sum(upper)
+    c_lower = np.sum(x * lower) / np.sum(lower)
+    return (c_upper + c_lower) / 2
 
 
-# ==============================================================
-# 9. Closed Loop Simulation
-# ==============================================================
-def simulate(
-    domains, mf, rules, plant_height, lamp_distance, max_epoch=50, stable_th=1
-):
-    xo = domains["output"]
-    pos = lamp_distance
+# Domain
+x_height = np.linspace(0, 110, 300)
+x_distance = np.linspace(0, 100, 300)
+x_output = np.linspace(-50, 50, 300)
 
-    print("\n=== SIMULASI CLOSED LOOP ===")
+# Membership Functions
+mf_height = {
+    "Semai": gaussian_t2(x_height, 8, 4, 2),
+    "Vegetatif": gaussian_t2(x_height, 30, 6, 3),
+    "Generatif": gaussian_t2(x_height, 60, 6, 3),
+    "Produktif": gaussian_t2(x_height, 90, 6, 3),
+}
 
-    for i in range(max_epoch):
-        agg_u, agg_l = infer(plant_height, pos, domains, mf, rules)
-        move = defuzz(xo, agg_u, agg_l)
-        new_pos = pos + move
+mf_distance = {
+    "Sangat Dekat": gaussian_t2(x_distance, 5, 3, 1.5),
+    "Dekat": gaussian_t2(x_distance, 15, 5, 3),
+    "Sedang": gaussian_t2(x_distance, 30, 6, 3),
+    "Jauh": gaussian_t2(x_distance, 50, 7, 4),
+    "Sangat Jauh": gaussian_t2(x_distance, 80, 7, 4),
+}
 
-        print(f"Epoch {i+1:02d} | Pos: {pos:.2f} | Move: {move:.2f}")
+mf_output = {
+    "Turun Banyak": gaussian_t2(x_output, -30, 6, 3),
+    "Turun Sedikit": gaussian_t2(x_output, -15, 5, 2),
+    "Diam": gaussian_t2(x_output, 0, 4, 2),
+    "Naik Sedikit": gaussian_t2(x_output, 15, 5, 2),
+    "Naik Banyak": gaussian_t2(x_output, 30, 6, 3),
+}
 
-        if abs(move) < stable_th:
-            print("✅ Sistem stabil")
+# Sidebar Input
+st.sidebar.header("🔧 Input Sensor")
+
+plant_height = st.sidebar.slider("Tinggi Tanaman (cm)", 0.0, 110.0, 30.0)
+lamp_distance = st.sidebar.slider("Jarak Lampu (cm)", 0.0, 100.0, 40.0)
+max_epoch = st.sidebar.slider("Batas Epoch Simulasi", 5, 50, 15)
+stabil_threshold = st.sidebar.slider("Threshold Stabil (cm)", 0.01, 1.0, 0.05)
+
+# Layout
+col1, col2 = st.columns(2)
+
+# PLOT Membership
+with col1:
+    st.subheader("📊 Membership Functions")
+
+    fig, axs = plt.subplots(3, 1, figsize=(7, 10))
+
+    # Height
+    for name, (u, l) in mf_height.items():
+        axs[0].fill_between(x_height, l, u, alpha=0.3, label=name)
+    axs[0].set_title("Membership Tinggi Tanaman")
+    axs[0].legend()
+    axs[0].grid(True)
+
+    # Distance
+    for name, (u, l) in mf_distance.items():
+        axs[1].fill_between(x_distance, l, u, alpha=0.3, label=name)
+    axs[1].set_title("Membership Jarak Lampu")
+    axs[1].legend()
+    axs[1].grid(True)
+
+    # Output
+    for name, (u, l) in mf_output.items():
+        axs[2].fill_between(x_output, l, u, alpha=0.3, label=name)
+    axs[2].set_title("Membership Gerak Lampu")
+    axs[2].legend()
+    axs[2].grid(True)
+
+    st.pyplot(fig)
+
+# FUZZIFIKASI
+with col2:
+    st.subheader("🔎 Fuzzifikasi")
+
+    μ = {
+        "Semai": fuzzify(plant_height, x_height, mf_height["Semai"]),
+        "Vegetatif": fuzzify(plant_height, x_height, mf_height["Vegetatif"]),
+        "Generatif": fuzzify(plant_height, x_height, mf_height["Generatif"]),
+        "Produktif": fuzzify(plant_height, x_height, mf_height["Produktif"]),
+        "Sangat Dekat": fuzzify(lamp_distance, x_distance, mf_distance["Sangat Dekat"]),
+        "Dekat": fuzzify(lamp_distance, x_distance, mf_distance["Dekat"]),
+        "Sedang": fuzzify(lamp_distance, x_distance, mf_distance["Sedang"]),
+        "Jauh": fuzzify(lamp_distance, x_distance, mf_distance["Jauh"]),
+        "Sangat Jauh": fuzzify(lamp_distance, x_distance, mf_distance["Sangat Jauh"]),
+    }
+
+    for k, v in μ.items():
+        st.write(f"{k}: **{v:.3f}**")
+
+# INFERENSI + SIMULASI
+st.subheader("⚙️ Simulasi Kontrol Lampu")
+
+if st.button("Mulai Simulasi"):
+    current_distance = lamp_distance
+    history = []
+
+    placeholder = st.empty()
+
+    for epoch in range(max_epoch):
+
+        μ_d = {
+            "Sangat Dekat": fuzzify(
+                current_distance, x_distance, mf_distance["Sangat Dekat"]
+            ),
+            "Dekat": fuzzify(current_distance, x_distance, mf_distance["Dekat"]),
+            "Sedang": fuzzify(current_distance, x_distance, mf_distance["Sedang"]),
+            "Jauh": fuzzify(current_distance, x_distance, mf_distance["Jauh"]),
+            "Sangat Jauh": fuzzify(
+                current_distance, x_distance, mf_distance["Sangat Jauh"]
+            ),
+        }
+
+        μ_h = {
+            "Semai": fuzzify(plant_height, x_height, mf_height["Semai"]),
+            "Vegetatif": fuzzify(plant_height, x_height, mf_height["Vegetatif"]),
+            "Generatif": fuzzify(plant_height, x_height, mf_height["Generatif"]),
+            "Produktif": fuzzify(plant_height, x_height, mf_height["Produktif"]),
+        }
+
+        rules = [
+            ("Semai", "Sangat Dekat", "Naik Sedikit"),
+            ("Semai", "Dekat", "Diam"),
+            ("Semai", "Sedang", "Turun Sedikit"),
+            ("Semai", "Jauh", "Turun Banyak"),
+            ("Semai", "Sangat Jauh", "Turun Banyak"),
+            ("Vegetatif", "Sangat Dekat", "Naik Banyak"),
+            ("Vegetatif", "Dekat", "Naik Sedikit"),
+            ("Vegetatif", "Sedang", "Diam"),
+            ("Vegetatif", "Jauh", "Turun Sedikit"),
+            ("Vegetatif", "Sangat Jauh", "Turun Banyak"),
+            ("Generatif", "Sangat Dekat", "Naik Banyak"),
+            ("Generatif", "Dekat", "Naik Sedikit"),
+            ("Generatif", "Sedang", "Diam"),
+            ("Generatif", "Jauh", "Turun Sedikit"),
+            ("Generatif", "Sangat Jauh", "Turun Sedikit"),
+            ("Produktif", "Sangat Dekat", "Naik Banyak"),
+            ("Produktif", "Dekat", "Naik Sedikit"),
+            ("Produktif", "Sedang", "Naik Sedikit"),
+            ("Produktif", "Jauh", "Diam"),
+            ("Produktif", "Sangat Jauh", "Diam"),
+        ]
+
+        aggregated_upper = np.zeros_like(x_output)
+        aggregated_lower = np.zeros_like(x_output)
+
+        for h, d, out in rules:
+            strength = min(μ_h[h], μ_d[d])
+            out_u, out_l = mf_output[out]
+            aggregated_upper = np.fmax(aggregated_upper, np.fmin(strength, out_u))
+            aggregated_lower = np.fmax(aggregated_lower, np.fmin(strength, out_l))
+
+        move = defuzz(x_output, aggregated_upper, aggregated_lower)
+
+        new_distance = current_distance + move
+        delta = abs(new_distance - current_distance)
+
+        history.append((epoch + 1, current_distance, move, new_distance, delta))
+
+        current_distance = new_distance
+
+        if delta < stabil_threshold:
             break
 
-        pos = new_pos
+    # ===============================
+    # Tampilkan hasil
+    # ===============================
+    st.write("### 🔄 Hasil Simulasi")
 
-
-# ==============================================================
-# 10. Main Program
-# ==============================================================
-def main():
-    domains = create_domains()
-    mf = build_memberships(domains)
-    rules = build_rules(mf)
-
-    # Plot
-    plot_mf(domains["height"], mf["height"], "MF Tinggi Tanaman")
-    plot_mf(domains["distance"], mf["distance"], "MF Jarak Lampu")
-    plot_mf(domains["output"], mf["output"], "MF Output Lampu")
-
-    # Input
-    plant_height = float(input("Tinggi Tanaman (cm): "))
-    lamp_distance = float(input("Jarak Lampu (cm): "))
-
-    simulate(domains, mf, rules, plant_height, lamp_distance)
-
-
-if __name__ == "__main__":
-    main()
+    st.table(
+        {
+            "Epoch": [h[0] for h in history],
+            "Jarak Awal (cm)": [round(h[1], 2) for h in history],
+            "Gerak Lampu (cm)": [round(h[2], 2) for h in history],
+            "Jarak Baru (cm)": [round(h[3], 2) for h in history],
+            "Delta": [round(h[4], 4) for h in history],
+        }
+    )
