@@ -1,0 +1,23 @@
+def build_rules():
+    return [
+        ("semai", "sangat_jauh", "turun_banyak"),
+        ("semai", "jauh", "turun_banyak"),
+        ("semai", "sedang", "turun_sedikit"),
+        ("semai", "dekat", "diam"),
+        ("semai", "sangat_dekat", "naik_sedikit"),
+        ("vegetatif", "sangat_jauh", "turun_banyak"),
+        ("vegetatif", "jauh", "turun_sedikit"),
+        ("vegetatif", "sedang", "diam"),
+        ("vegetatif", "dekat", "naik_sedikit"),
+        ("vegetatif", "sangat_dekat", "naik_banyak"),
+        ("generatif", "sangat_jauh", "turun_sedikit"),
+        ("generatif", "jauh", "turun_sedikit"),
+        ("generatif", "sedang", "diam"),
+        ("generatif", "dekat", "naik_sedikit"),
+        ("generatif", "sangat_dekat", "naik_banyak"),
+        ("produktif", "sangat_jauh", "diam"),
+        ("produktif", "jauh", "diam"),
+        ("produktif", "sedang", "naik_sedikit"),
+        ("produktif", "dekat", "naik_sedikit"),
+        ("produktif", "sangat_dekat", "naik_banyak"),
+    ]
