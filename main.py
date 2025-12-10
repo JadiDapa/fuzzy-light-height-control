@@ -193,7 +193,9 @@ if st.button("Mulai Simulasi"):
     # ===============================
     # Tampilkan hasil
     # ===============================
-    st.write("### 🔄 Hasil Simulasi")
+    st.write(f"### 🔄 Hasil Simulasi")
+    st.write(f"#### Tinggi Tanaman: {plant_height} cm")
+    st.write(f"#### Jarak Lampu Tanaman: {lamp_distance} cm")
 
     st.table(
         {
@@ -204,3 +206,36 @@ if st.button("Mulai Simulasi"):
             "Delta": [round(h[4], 4) for h in history],
         }
     )
+
+    # ===============================
+    # Grafik Terpisah
+    # ===============================
+    st.write("### 📊 Grafik Terpisah per Epoch")
+
+    epochs = [h[0] for h in history]
+    distance = [h[1] for h in history]
+    movement = [h[2] for h in history]
+
+    col1, col2 = st.columns(2)
+
+    # --- 2. Grafik Jarak Lampu ---
+    with col1:
+        st.write("#### 💡 Jarak Lampu")
+        fig_d, ax_d = plt.subplots(figsize=(4, 3))
+        ax_d.plot(epochs, distance, marker="s", color="green")
+        ax_d.set_xlabel("Epoch")
+        ax_d.set_ylabel("Jarak (cm)")
+        ax_d.set_title("Jarak Lampu")
+        ax_d.grid(True)
+        st.pyplot(fig_d)
+
+    # --- 3. Grafik Gerakan Lampu ---
+    with col2:
+        st.write("#### 🔼 Gerakan")
+        fig_m, ax_m = plt.subplots(figsize=(4, 3))
+        ax_m.plot(epochs, movement, marker="^")
+        ax_m.set_xlabel("Epoch")
+        ax_m.set_ylabel("Gerakan (cm)")
+        ax_m.set_title("Gerakan Lampu")
+        ax_m.grid(True)
+        st.pyplot(fig_m)
